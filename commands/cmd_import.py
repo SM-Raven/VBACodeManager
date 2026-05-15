@@ -10,15 +10,15 @@ Supports:
 import typer
 from pathlib import Path
 from typing import Optional, List, Tuple
-from ..utils import WorkbookManager
-from ..utils.exceptions import (
+from utils import WorkbookManager
+from utils.exceptions import (
     SourceFolderNotFoundError,
     FileNotFoundError,
 )
-from ..vba.extractor import VBAExtractor
-from ..vba.injector import VBAInjector, VBAComponent, ComponentType
-from ..utils.file_handler import FileHandler
-from ..config import VCMConfig
+from vba.extractor import VBAExtractor
+from vba.injector import VBAInjector, VBAComponent, ComponentType
+from utils.file_handler import FileHandler
+from config import VCMConfig
 
 app = typer.Typer(help="Import VBA components to Excel workbook")
 

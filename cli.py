@@ -5,8 +5,12 @@ Registers all commands: export, import, format
 
 import typer
 from typing import Optional
-from . import version
-from .commands import cmd_export, cmd_import, cmd_format
+
+import version
+import commands.cmd_export as cmd_export
+import commands.cmd_import as cmd_import
+import commands.cmd_format as cmd_format
+
 # Create main Typer app
 app = typer.Typer(
     name="vcm",
