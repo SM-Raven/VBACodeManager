@@ -1,17 +1,11 @@
-"""
-VCM CLI - Main entry point
-Registers all commands: export, import, format
-"""
-
 import typer
 from typing import Optional
 
-import version
-import commands.cmd_export as cmd_export
-import commands.cmd_import as cmd_import
-import commands.cmd_format as cmd_format
+from version import get_version
+from commands.cmd_export import export_command
+from commands.cmd_import import import_command
+from commands.cmd_format import format_command
 
-# Create main Typer app
 app = typer.Typer(
     name="vcm",
     help="VBA Component Manager - Export/Import VBA components from Excel workbooks",
@@ -19,10 +13,9 @@ app = typer.Typer(
     rich_markup_mode="rich"
 )
 
-# Add commands
-app.command(name="export")(cmd_export.export_command)
-app.command(name="import")(cmd_import.import_command)
-app.command(name="format")(cmd_format.format_command)
+app.command(name="export")(export_command)
+app.command(name="import")(import_command)
+app.command(name="format")(format_command)
 
 
 @app.callback(invoke_without_command=True)
@@ -33,47 +26,8 @@ def main(
         "-v",
         help="Show version and exit",
         is_flag=True,
-        callback=None,
     ),
 ):
-    """
-    VBA Component Manager
-
-    Manage VBA components in Excel workbooks with ease.
-
-    [bold cyan]Commands:[/bold cyan]
-
-    [yellow]vcm export[/yellow]               Export VBA components from workbook
-    [yellow]vcm import[/yellow]               Import VBA components to workbook
-    [yellow]vcm format[/yellow]               Format VBA code
-
-    [bold cyan]Examples:[/bold cyan]
-
-    [green]# Export all components[/green]
-    vcm export
-
-    [green]# Export single component[/green]
-    vcm export --onefile cls/MyClass
-
-    [green]# Import all components[/green]
-    vcm import
-
-    [green]# Import and remove missing[/green]
-    vcm import --force
-
-    [green]# Format all code[/green]
-    vcm format --all
-
-    For more help on a command:
-    vcm export --help
-    vcm import --help
-    vcm format --help
-    """
     if version_flag:
-        version_str = version.get_version()
-        typer.echo(f"vcm version {version_str}")
+        typer.echo(f"vcm version {get_version()}")
         raise typer.Exit()
-
-
-if __name__ == "__main__":
-    app()

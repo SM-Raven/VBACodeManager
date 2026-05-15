@@ -11,11 +11,7 @@ import typer
 from pathlib import Path
 from typing import Optional
 from utils.workbook import WorkbookManager
-from utils.exceptions import (
-    NoWorkbookOpenError,
-    MultipleWorkbooksError,
-    ComponentNotFoundError,
-)
+from utils.exceptions import ComponentNotFoundError
 from vba.extractor import VBAExtractor
 from utils.file_handler import FileHandler
 from config import VCMConfig

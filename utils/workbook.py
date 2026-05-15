@@ -10,15 +10,15 @@ import win32com.client as win32
 
 class WorkbookManager:
     """Manages Excel workbook COM interactions"""
-    
+
     @staticmethod
     def get_excel_application():
         """
         Get the Excel application object (COM).
-        
+
         Returns:
             Excel.Application COM object
-            
+
         Raises:
             RuntimeError: If Excel is not running
         """
@@ -36,12 +36,12 @@ class WorkbookManager:
                     "Excel is not running or not installed.\n"
                     "Please start Excel and try again."
                 ) from e
-    
+
     @staticmethod
     def get_open_workbooks():
         """
         Get list of all open workbooks.
-        
+
         Returns:
             List of Excel workbook COM objects
         """
@@ -50,27 +50,27 @@ class WorkbookManager:
             return list(excel.Workbooks)
         except Exception as e:
             raise RuntimeError(f"Failed to get open workbooks: {str(e)}") from e
-    
+
     @staticmethod
     def validate_single_workbook():
         """
         Ensure exactly one workbook is open.
-        
+
         Returns:
             The single open workbook COM object
-            
+
         Raises:
             ValueError: If zero or multiple workbooks are open
         """
         try:
             workbooks = WorkbookManager.get_open_workbooks()
-            
+
             if len(workbooks) == 0:
                 raise ValueError(
                     "❌ Error: No Excel workbook is currently open.\n"
                     "Please open an Excel file (.xlsm, .xla, or .xls) before running this command."
                 )
-            
+
             if len(workbooks) > 1:
                 names = ", ".join([wb.Name for wb in workbooks])
                 raise ValueError(
@@ -79,21 +79,21 @@ class WorkbookManager:
                     "VCM requires exactly one workbook to be open.\n"
                     "Please close all but one workbook and try again."
                 )
-            
+
             return workbooks[0]
         except ValueError:
             raise
         except Exception as e:
             raise RuntimeError(f"Failed to validate workbooks: {str(e)}") from e
-    
+
     @staticmethod
     def get_workbook_info(workbook) -> Tuple[str, str, str]:
         """
         Get information about a workbook.
-        
+
         Args:
             workbook: Excel workbook COM object
-            
+
         Returns:
             Tuple of (name, full_path, extension)
         """
@@ -104,18 +104,18 @@ class WorkbookManager:
             return name, full_path, extension
         except Exception as e:
             raise RuntimeError(f"Failed to get workbook info: {str(e)}") from e
-    
+
     @staticmethod
     def get_vba_project(workbook):
         """
         Get the VBA project from a workbook.
-        
+
         Args:
             workbook: Excel workbook COM object
-            
+
         Returns:
             VBProject object
-            
+
         Raises:
             ValueError: If VBA project is not accessible
         """
@@ -132,15 +132,15 @@ class WorkbookManager:
                 f"Cannot access VBA project in '{workbook.Name}'.\n"
                 f"Error: {str(e)}"
             ) from e
-    
+
     @staticmethod
     def is_workbook_supported(full_path: str) -> bool:
         """
         Check if workbook has supported extension.
-        
+
         Args:
             full_path: Full path to workbook file
-            
+
         Returns:
             True if supported (.xlsm, .xla, .xls)
         """

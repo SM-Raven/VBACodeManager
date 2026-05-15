@@ -10,7 +10,7 @@ Supports:
 import typer
 from pathlib import Path
 from typing import Optional, List, Tuple
-from utils import WorkbookManager
+from utils.workbook import WorkbookManager
 from utils.exceptions import (
     SourceFolderNotFoundError,
     FileNotFoundError,
