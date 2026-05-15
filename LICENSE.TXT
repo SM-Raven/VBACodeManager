@@ -1,0 +1,31 @@
+Raven Mark S. Eduardo Software License
+Copyright (c) 2026 Raven Mark S. Eduardo
+
+All rights reserved.
+
+1. Permission of Use
+This software is provided for use by any individual or organization for personal, educational, or internal business purposes. You are allowed to use this software anywhere.
+
+2. Restrictions
+You are strictly NOT permitted to:
+
+a) Redistribute, share, or publish this software in any form, whether original or modified.
+b) Sell, sublicense, rent, lease, or otherwise commercially exploit this software.
+c) Provide copies of this software to others, whether for free or for payment.
+d) Modify, adapt, or create derivative works and distribute them.
+e) Remove, alter, or obscure the author's name or copyright notice.
+f) Rename the author or claim this software as your own.
+
+3. Ownership
+This software and all associated rights remain the exclusive property of Raven Mark S. Eduardo.
+
+4. Violation and Termination
+Any violation of these terms will immediately terminate your right to use this software. Upon termination, you must delete all copies of the software in your possession.
+
+Unauthorized use, redistribution, or commercial exploitation may result in legal action.
+
+5. Disclaimer
+This software is provided "as is" without warranty of any kind, express or implied. The author is not liable for any damages arising from the use of this software.
+
+6. Contact
+For permissions beyond the scope of this license, please contact the author directly.
