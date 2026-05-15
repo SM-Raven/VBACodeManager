@@ -6,8 +6,7 @@ Registers all commands: export, import, format
 import typer
 from typing import Optional
 from . import version
-from .commands import export_refactored, import_refactored, format_refactored
-
+from .commands import cmd_export, cmd_import, cmd_format
 # Create main Typer app
 app = typer.Typer(
     name="vcm",
@@ -17,9 +16,9 @@ app = typer.Typer(
 )
 
 # Add commands
-app.command(name="export")(export_refactored.export_command)
-app.command(name="import")(import_refactored.import_command)
-app.command(name="format")(format_refactored.format_command)
+app.command(name="export")(cmd_export.export_command)
+app.command(name="import")(cmd_import.import_command)
+app.command(name="format")(cmd_format.format_command)
 
 
 @app.callback(invoke_without_command=True)
@@ -35,32 +34,32 @@ def main(
 ):
     """
     VBA Component Manager
-    
+
     Manage VBA components in Excel workbooks with ease.
-    
+
     [bold cyan]Commands:[/bold cyan]
-    
+
     [yellow]vcm export[/yellow]               Export VBA components from workbook
     [yellow]vcm import[/yellow]               Import VBA components to workbook
     [yellow]vcm format[/yellow]               Format VBA code
-    
+
     [bold cyan]Examples:[/bold cyan]
-    
+
     [green]# Export all components[/green]
     vcm export
-    
+
     [green]# Export single component[/green]
     vcm export --onefile cls/MyClass
-    
+
     [green]# Import all components[/green]
     vcm import
-    
+
     [green]# Import and remove missing[/green]
     vcm import --force
-    
+
     [green]# Format all code[/green]
     vcm format --all
-    
+
     For more help on a command:
     vcm export --help
     vcm import --help

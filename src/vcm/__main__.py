@@ -1,8 +1,7 @@
 """
-VCM - Entry point for python -m vcm
+Entry Point for VBA Code Manager
 """
 
-import sys
 from .cli import app
 
 if __name__ == "__main__":
