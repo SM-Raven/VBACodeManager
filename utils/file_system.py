@@ -6,7 +6,6 @@
 from pathlib import Path
 from constants import EXPORT_FOLDERS
 
-
 class FileSystem:
     """Handles project folder structure for VCM"""
 
