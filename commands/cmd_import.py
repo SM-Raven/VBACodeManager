@@ -15,7 +15,6 @@ from utils.exceptions import (
     SourceFolderNotFoundError,
     FileNotFoundError,
 )
-from vba.extractor import VBAExtractor
 from vba.injector import VBAInjector, VBAComponent, ComponentType
 from utils.file_handler import FileHandler
 from config import VCMConfig

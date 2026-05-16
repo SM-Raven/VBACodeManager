@@ -18,14 +18,13 @@ from config import VCMConfig
 
 app = typer.Typer(help="Export VBA components from Excel workbook")
 
-
 @app.command()
 def export_command(
     onefile: Optional[str] = typer.Option(
         None,
         "--onefile",
         "-o",
-        help="Export only one component (format: cls/MyClass or mod/Module.bas)",
+        help="Export only one component (format: cls/MyClass.cls or mod/Module.bas)",
     ),
     force: bool = typer.Option(
         False,
@@ -67,7 +66,6 @@ def export_command(
 
             typer.echo("📂 Creating src folder structure...")
             FileHandler.create_src_structure(src_path, force=False)
-            typer.echo("✓ Folder structure ready")
 
         # Step 3: Extract components
         typer.echo(f"📤 Exporting from {wb_name}...")
