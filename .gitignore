@@ -8,3 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Excel files
+*.xls
+*.xlsx
+*.xlsm
+*.xlsb
+*.xlt
+*.xltx
+*.xltm
+*.xla
+*.xlam
+src/
+
+# Excel temporary / lock files
+~$*

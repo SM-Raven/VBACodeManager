@@ -1,29 +1,15 @@
-"""
-Export Command - Export VBA components from Excel workbook to src folder
-
-Supports:
-    vcm export
-    vcm export --onefile cls/MyClass
-    vcm export --force
-    vcm export --onefile cls/MyClass --force
-"""
-
-import shutil
-from pathlib import Path
-from typing import Optional
-
 import typer
-
+from typing import Optional
+from utils.workbook import get_active_workbook
+from utils.file_system import FileSystem
 from constants import (
     ComponentType,
     EXPORT_EXTENSIONS,
     EXPORT_FOLDERS,
     SUPPORTED_COMPONENT_TYPES,
 )
-from utils.workbook import get_active_workbook
 
 app = typer.Typer(help="Export VBA components from Excel workbook")
-
 
 @app.command(name="export")
 def export_command(
@@ -44,80 +30,77 @@ def export_command(
     Export Command - Export VBA components from Excel workbook to src folder
 
     Supports:
-        vcm export
-        vcm export --onefile cls/MyClass
-        vcm export --force
-        vcm export --onefile cls/MyClass --force
+        vcm export                          (skip existing, export new)
+        vcm export --onefile cls/MyClass    (ask user if file exists)
+        vcm export --force                  (overwrite all)
+        vcm export --onefile cls/MyClass --force (overwrite immediately)
     """
 
     try:
+
+        fs = FileSystem()
+        fs.ensure_structure()
+
         wb = get_active_workbook()
         vb_components = wb.VBProject.VBComponents
 
-        src_dir = Path.cwd() / "src"
-
-        # Clear src folder if exporting all with --force
-        if force and onefile is None and src_dir.exists():
-            shutil.rmtree(src_dir)
-
-        src_dir.mkdir(parents=True, exist_ok=True)
-
         exported_count = 0
         skipped_count = 0
-
         target_component = None
 
         if onefile:
             target_component = onefile.replace("\\", "/").strip()
 
         for component in vb_components:
-
             component_type = component.Type
             component_name = component.Name
 
-            # Skip unsupported component types
             if component_type not in SUPPORTED_COMPONENT_TYPES:
                 continue
 
             component_type = ComponentType(component_type)
-
             folder_name = EXPORT_FOLDERS[component_type]
             extension = EXPORT_EXTENSIONS[component_type]
-
             component_identifier = f"{folder_name}/{component_name}"
 
             # Skip if not matching --onefile target
             if target_component and component_identifier != target_component:
                 continue
 
-            export_folder = src_dir / folder_name
-            export_folder.mkdir(parents=True, exist_ok=True)
+            # Build export path
+            export_path = fs.src_dir / folder_name / f"{component_name}{extension}"
 
-            export_path = export_folder / f"{component_name}{extension}"
+            # Handle existing files
+            if export_path.exists():
+                if onefile and not force:
+                    # Scenario: export -o name (ask user)
+                    if not typer.confirm(
+                        f"⚠️ {component_identifier} already exists. Overwrite and potentially lose progress?"
+                    ):
+                        typer.echo(f"⏭️ Skipped existing: {component_identifier}")
+                        skipped_count += 1
+                        continue
+                elif not onefile and not force:
+                    # Scenario: export (skip existing)
+                    typer.echo(f"⏭️ Skipped existing: {component_identifier}")
+                    skipped_count += 1
+                    continue
+                # Scenarios: export -f OR export -o name -f (proceed to export)
 
-            # Skip existing unless --force
-            if export_path.exists() and not force:
-                typer.echo(f"⏭️ Skipped existing: {component_identifier}")
-                skipped_count += 1
-                continue
-
+            # Export the component
             try:
-
-                # Standard modules, classes, forms
                 if component_type in {
                     ComponentType.STANDARD_MODULE,
                     ComponentType.CLASS_MODULE,
                     ComponentType.USER_FORM,
                 }:
+                    # Use VBA's built-in Export method
                     component.Export(str(export_path))
-
-                # Document modules (ThisWorkbook, Sheet1, etc.)
                 elif component_type == ComponentType.DOCUMENT_MODULE:
-
+                    # Document modules need manual code extraction
                     code_module = component.CodeModule
                     total_lines = code_module.CountOfLines
-
-                    code = code_module.Lines(1, total_lines)
+                    code = clean_vba_code(code_module.Lines(1, total_lines))
 
                     with open(export_path, "w", encoding="utf-8") as file:
                         file.write(code)
@@ -131,7 +114,7 @@ def export_command(
                     err=True,
                 )
 
-        # No component matched --onefile
+        # Handle component not found
         if target_component and exported_count == 0 and skipped_count == 0:
             typer.echo(
                 f"❌ Component not found: {target_component}",
@@ -146,3 +129,29 @@ def export_command(
     except Exception as e:
         typer.echo(f"❌ Export failed: {e}", err=True)
         raise typer.Exit(code=1)
+
+def clean_vba_code(code: str) -> str:
+    lines = code.splitlines()
+
+    cleaned = []
+    prev_blank = True  # important: prevents leading blank lines
+
+    for line in lines:
+        is_blank = line == ""
+
+        if is_blank:
+            if not prev_blank:
+                cleaned.append("")
+            prev_blank = True
+        else:
+            cleaned.append(line)
+            prev_blank = False
+
+    # remove trailing blank lines
+    while cleaned and cleaned[-1] == "":
+        cleaned.pop()
+
+    return "\n".join(cleaned)
+
+if __name__ == "__main__":
+    app()
