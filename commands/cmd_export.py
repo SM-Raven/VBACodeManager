@@ -123,7 +123,7 @@ def export_command(
             raise typer.Exit(code=1)
 
         typer.echo(
-            f"\n📦 Export complete | Exported: {exported_count} | Skipped: {skipped_count}"
+            f"\n📦 Export complete | Exported: {exported_count} | Skipped: {skipped_count}\n"
         )
 
     except Exception as e:
