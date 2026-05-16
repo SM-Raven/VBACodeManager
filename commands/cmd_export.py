@@ -1,214 +1,148 @@
 """
 Export Command - Export VBA components from Excel workbook to src folder
-Supports both:
-  - vcm export (all components)
-  - vcm export --onefile component_name (single component)
-  - vcm export --force (overwrite all)
-  - vcm export --onefile component_name --force (overwrite single)
+
+Supports:
+    vcm export
+    vcm export --onefile cls/MyClass
+    vcm export --force
+    vcm export --onefile cls/MyClass --force
 """
 
-import typer
+import shutil
 from pathlib import Path
 from typing import Optional
-from utils.workbook import WorkbookManager
-from utils.exceptions import ComponentNotFoundError
-from vba.extractor import VBAExtractor
-from utils.file_handler import FileHandler
-from config import VCMConfig
+
+import typer
+
+from constants import (
+    ComponentType,
+    EXPORT_EXTENSIONS,
+    EXPORT_FOLDERS,
+    SUPPORTED_COMPONENT_TYPES,
+)
+from utils.workbook import get_active_workbook
 
 app = typer.Typer(help="Export VBA components from Excel workbook")
 
-@app.command()
+
+@app.command(name="export")
 def export_command(
     onefile: Optional[str] = typer.Option(
         None,
         "--onefile",
         "-o",
-        help="Export only one component (format: cls/MyClass.cls or mod/Module.bas)",
+        help="Export only one component (example: cls/MyClass)",
     ),
     force: bool = typer.Option(
         False,
         "--force",
         "-f",
-        help="Overwrite existing components (or delete src folder if exporting all)",
+        help="Overwrite existing files",
     ),
 ):
     """
-    Export VBA components from the currently open Excel workbook.
+    Export Command - Export VBA components from Excel workbook to src folder
 
-    By default, skips components that already exist in the src folder.
-    Use --force to overwrite existing components.
-
-    Examples:
-        vcm export                              # Export all, skip existing
-        vcm export --force                      # Export all, overwrite all
-        vcm export --onefile cls/MyClass        # Export single component
-        vcm export --onefile cls/MyClass -f     # Export single, overwrite
+    Supports:
+        vcm export
+        vcm export --onefile cls/MyClass
+        vcm export --force
+        vcm export --onefile cls/MyClass --force
     """
+
     try:
-        typer.echo("📁 Checking for open Excel workbook...")
+        wb = get_active_workbook()
+        vb_components = wb.VBProject.VBComponents
 
-        # Step 1: Get and validate workbook
-        workbook = WorkbookManager.validate_single_workbook()
-        wb_name, wb_path, wb_ext = WorkbookManager.get_workbook_info(workbook)
+        src_dir = Path.cwd() / "src"
 
-        typer.echo(f"✓ Found workbook: {wb_name}")
+        # Clear src folder if exporting all with --force
+        if force and onefile is None and src_dir.exists():
+            shutil.rmtree(src_dir)
 
-        # Step 2: Setup src folder structure
-        config = VCMConfig()
-        src_path = Path(config.src_folder)
+        src_dir.mkdir(parents=True, exist_ok=True)
 
-        # If exporting all (not onefile), prepare folder structure
-        if not onefile:
-            if force:
-                typer.echo("🗑️  Deleting existing src folder...")
-                FileHandler.delete_folder(src_path)
+        exported_count = 0
+        skipped_count = 0
 
-            typer.echo("📂 Creating src folder structure...")
-            FileHandler.create_src_structure(src_path, force=False)
-
-        # Step 3: Extract components
-        typer.echo(f"📤 Exporting from {wb_name}...")
-        extractor = VBAExtractor(workbook)
+        target_component = None
 
         if onefile:
-            # Export single component
-            _export_single_component(extractor, src_path, onefile, force)
-        else:
-            # Export all components
-            _export_all_components(extractor, src_path, force)
+            target_component = onefile.replace("\\", "/").strip()
 
-    except (ValueError, TypeError, ComponentNotFoundError) as e:
-        typer.echo(f"❌ {str(e)}", err=True)
-        raise typer.Exit(code=1)
-    except Exception as e:
-        typer.echo(f"❌ Unexpected error: {str(e)}", err=True)
-        raise typer.Exit(code=1)
+        for component in vb_components:
 
+            component_type = component.Type
+            component_name = component.Name
 
-def _export_single_component(
-    extractor: VBAExtractor,
-    src_path: Path,
-    onefile: str,
-    force: bool
-) -> None:
-    """
-    Export a single component by name.
+            # Skip unsupported component types
+            if component_type not in SUPPORTED_COMPONENT_TYPES:
+                continue
 
-    Args:
-        extractor: VBAExtractor instance
-        src_path: Path to src folder
-        onefile: Component specification (e.g., 'cls/MyClass')
-        force: If True, overwrite existing
+            component_type = ComponentType(component_type)
 
-    Raises:
-        ComponentNotFoundError: If component doesn't exist
-    """
-    # Parse the onefile argument
-    try:
-        component_type, component_name, extension = FileHandler.parse_onefile_path(onefile)
-    except ValueError as e:
-        raise TypeError(f"Invalid component specification: {str(e)}")
+            folder_name = EXPORT_FOLDERS[component_type]
+            extension = EXPORT_EXTENSIONS[component_type]
 
-    # Extract the component
-    component = extractor.extract_component_by_name(component_name)
+            component_identifier = f"{folder_name}/{component_name}"
 
-    if component is None:
-        # Component doesn't exist in workbook
-        typer.echo(
-            f"❌ Component '{component_name}' not found in workbook.\n"
-            f"Available components:\n"
-        )
+            # Skip if not matching --onefile target
+            if target_component and component_identifier != target_component:
+                continue
 
-        available = extractor.list_components()
-        if available:
-            for name in sorted(available):
-                typer.echo(f"  - {name}")
-        else:
-            typer.echo("  (no components found)")
+            export_folder = src_dir / folder_name
+            export_folder.mkdir(parents=True, exist_ok=True)
 
-        raise ComponentNotFoundError(component_name, extractor.workbook_name)
+            export_path = export_folder / f"{component_name}{extension}"
 
-    # Write component to file
-    target_folder = src_path / component.get_folder()
-    target_file = target_folder / f"{component_name}{extension}"
+            # Skip existing unless --force
+            if export_path.exists() and not force:
+                typer.echo(f"⏭️ Skipped existing: {component_identifier}")
+                skipped_count += 1
+                continue
 
-    # Check if already exists
-    if target_file.exists() and not force:
-        typer.echo(
-            f"❌ Component already exists: {target_file.relative_to(Path.cwd())}\n"
-            f"Use --force to overwrite."
-        )
-        raise typer.Exit(code=1)
+            try:
 
-    # Ensure folder structure
-    FileHandler.ensure_folder(target_folder)
+                # Standard modules, classes, forms
+                if component_type in {
+                    ComponentType.STANDARD_MODULE,
+                    ComponentType.CLASS_MODULE,
+                    ComponentType.USER_FORM,
+                }:
+                    component.Export(str(export_path))
 
-    # Write the file
-    FileHandler.write_component(target_folder, component_name, component.code, extension)
+                # Document modules (ThisWorkbook, Sheet1, etc.)
+                elif component_type == ComponentType.DOCUMENT_MODULE:
 
-    action = "Overwrote" if target_file.exists() else "Exported"
-    typer.echo(f"✓ {action}: {component_name}")
-    typer.echo(f"  Location: {target_file.relative_to(Path.cwd())}")
+                    code_module = component.CodeModule
+                    total_lines = code_module.CountOfLines
 
+                    code = code_module.Lines(1, total_lines)
 
-def _export_all_components(
-    extractor: VBAExtractor,
-    src_path: Path,
-    force: bool
-) -> None:
-    """
-    Export all components from workbook.
+                    with open(export_path, "w", encoding="utf-8") as file:
+                        file.write(code)
 
-    Args:
-        extractor: VBAExtractor instance
-        src_path: Path to src folder
-        force: If True, overwrite all existing
-    """
-    # Extract all components
-    components = extractor.extract_all_components()
+                typer.echo(f"✅ Exported: {component_identifier}")
+                exported_count += 1
 
-    if not components:
-        typer.echo("⚠️  No VBA components found in workbook")
-        return
+            except Exception as e:
+                typer.echo(
+                    f"❌ Failed to export {component_name}: {e}",
+                    err=True,
+                )
 
-    # Export each component
-    skipped = 0
-    exported = 0
-
-    for component in components:
-        target_folder = src_path / component.get_folder()
-        target_file = target_folder / component.get_filename()
-
-        # Ensure folder exists
-        FileHandler.ensure_folder(target_folder)
-
-        if target_file.exists() and not force:
-            # Skip existing
-            typer.echo(f"  ⊘ Skipped: {component.name} (already exists)")
-            skipped += 1
-        else:
-            # Write component
-            FileHandler.write_component(
-                target_folder,
-                component.name,
-                component.code,
-                component.get_extension()
+        # No component matched --onefile
+        if target_component and exported_count == 0 and skipped_count == 0:
+            typer.echo(
+                f"❌ Component not found: {target_component}",
+                err=True,
             )
-            action = "Overwrote" if target_file.exists() else "Exported"
-            typer.echo(f"  ✓ {action}: {component.name}")
-            exported += 1
+            raise typer.Exit(code=1)
 
-    # Summary
-    typer.echo("")
-    typer.echo("="*50)
-    typer.echo(f"✅ Export completed!")
-    typer.echo(f"   Exported: {exported} components")
-    if skipped > 0:
-        typer.echo(f"   Skipped:  {skipped} components")
-    typer.echo(f"   Location: {src_path.absolute()}")
-    typer.echo("="*50)
+        typer.echo(
+            f"\n📦 Export complete | Exported: {exported_count} | Skipped: {skipped_count}"
+        )
 
-
-if __name__ == "__main__":
-    app()
+    except Exception as e:
+        typer.echo(f"❌ Export failed: {e}", err=True)
+        raise typer.Exit(code=1)

@@ -3,6 +3,7 @@ Configuration module - Central place for VCM settings
 """
 
 from dataclasses import dataclass, field
+from utils.workbook import SUPPORTED_EXTENSIONS
 from pathlib import Path
 from typing import Dict
 
@@ -23,9 +24,6 @@ class VCMConfig:
             "exl": "Excel Objects"
         }
     )
-
-    # Supported file extensions
-    supported_extensions: tuple = (".xlsm", ".xla", ".xls")
 
     # File extensions for each component type
     extension_mapping: Dict[str, str] = field(
