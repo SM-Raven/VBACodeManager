@@ -1,6 +1,6 @@
 import typer
 from pathlib import Path
-from utils.formatter import VBAFormatter
+from utils.formatter import format_vba_code
 from utils.file_system import FileSystem  # your existing one
 
 app = typer.Typer(help="Format VBA code in src folder")
@@ -31,12 +31,10 @@ def format_command(
     if not all and not onefile:
         raise typer.Exit("❌ Specify --all or --onefile.")
 
-    formatter = VBAFormatter()
-
     if all:
-        count = _format_all(src_path, formatter, indent)
+        count = _format_all(src_path, indent)
     else:
-        count = _format_one(src_path, onefile, formatter, indent)
+        count = _format_one(src_path, onefile, indent)
 
     typer.echo("")
     typer.echo("=" * 50)
@@ -45,7 +43,7 @@ def format_command(
     typer.echo("=" * 50)
 
 
-def _format_all(src_path: Path, formatter: VBAFormatter, indent: int) -> int:
+def _format_all(src_path: Path, indent: int) -> int:
     files = _get_vba_files(src_path)
 
     if not files:
@@ -57,7 +55,7 @@ def _format_all(src_path: Path, formatter: VBAFormatter, indent: int) -> int:
     for file_path in files:
         try:
             code = file_path.read_text(encoding="utf-8")
-            formatted = formatter.format_code(code, indent)
+            formatted = format_vba_code(code, indent)
 
             if formatted != code:
                 file_path.write_text(formatted, encoding="utf-8")
@@ -73,7 +71,7 @@ def _format_all(src_path: Path, formatter: VBAFormatter, indent: int) -> int:
     return processed
 
 
-def _format_one(src_path: Path, onefile: str, formatter: VBAFormatter, indent: int) -> int:
+def _format_one(src_path: Path, onefile: str, indent: int) -> int:
     try:
         component_type, name = onefile.split("/", 1)
     except ValueError:
@@ -89,7 +87,7 @@ def _format_one(src_path: Path, onefile: str, formatter: VBAFormatter, indent: i
     file_path = matches[0]
 
     code = file_path.read_text(encoding="utf-8")
-    formatted = formatter.format_code(code, indent)
+    formatted = format_vba_code(code, indent)
 
     if formatted != code:
         file_path.write_text(formatted, encoding="utf-8")

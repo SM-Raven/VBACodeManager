@@ -7,9 +7,9 @@ import click
 from typing import Optional
 from commands.cmd_export import export_command
 from commands.cmd_import import import_command
-# from commands.cmd_format import format_command
+from commands.cmd_format import format_command
 
-VCM_VERSION: str = "0.1.0"
+VCM_VERSION: str = "0.1.3"
 
 app = typer.Typer(
     name="vcm",
@@ -20,7 +20,7 @@ app = typer.Typer(
 
 app.command(name="export")(export_command)
 app.command(name="import")(import_command)
-# app.command(name="format")(format_command)
+app.command(name="format")(format_command)
 
 @app.callback(invoke_without_command=True)
 def main(
