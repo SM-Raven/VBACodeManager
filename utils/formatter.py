@@ -6,7 +6,7 @@ import re
 from typing import List
 
 
-def format_vba_code(code: str, indent: int = 4) -> str:
+def format_vba_code(code: str, indent: int = 2) -> str:
     """
     Format VBA/VB6/VBScript code with:
     - Proper indentation
@@ -27,25 +27,31 @@ def format_vba_code(code: str, indent: int = 4) -> str:
         original_line = line.rstrip()
         stripped_line = line.strip()
 
+        # Check if we're entering a metadata block
+        if _is_begin_statement(stripped_line):
+            in_metadata_block = True
+            processed_lines.append(original_line)
+            continue
+
+        # Check if we're exiting a metadata block
+        if _is_end_statement(stripped_line) and in_metadata_block:
+            in_metadata_block = False
+            processed_lines.append(original_line)
+            continue
+
+        # If inside a metadata block, preserve everything as-is (with original indentation)
+        if in_metadata_block:
+            processed_lines.append(original_line)
+            continue
+
         # Labels must NOT be indented
         if _is_label(stripped_line):
             processed_lines.append(stripped_line)
             continue
 
-        # Preserve metadata formatting (including indentation within BEGIN/END blocks)
+        # Preserve other metadata formatting
         if _is_metadata_line(stripped_line):
-            if in_metadata_block:
-                # Preserve original indentation inside BEGIN/END metadata blocks
-                processed_lines.append(original_line)
-            else:
-                # For standalone metadata lines, preserve original formatting
-                processed_lines.append(original_line)
-
-            if stripped_line.upper().startswith("BEGIN"):
-                in_metadata_block = True
-            elif stripped_line.upper() == "END" and in_metadata_block:
-                in_metadata_block = False
-
+            processed_lines.append(original_line)
             continue
 
         # Preserve blank lines for cleanup later
@@ -85,6 +91,7 @@ def format_vba_code(code: str, indent: int = 4) -> str:
     # Cleanup + spacing passes
     cleaned_lines = _cleanup_blank_lines(processed_lines)
     cleaned_lines = _handle_option_explicit(cleaned_lines)
+    cleaned_lines = _add_spacing_after_metadata_header(cleaned_lines)
     cleaned_lines = _add_procedure_spacing(cleaned_lines)
     cleaned_lines = _remove_blank_lines_in_type_enum(cleaned_lines)
     cleaned_lines = _add_blank_lines_around_blocks(cleaned_lines)
@@ -93,16 +100,41 @@ def format_vba_code(code: str, indent: int = 4) -> str:
     return "\n".join(cleaned_lines)
 
 
+def _is_begin_statement(line: str) -> bool:
+    """
+    Detect BEGIN statement (start of metadata block).
+    Matches: Begin, BEGIN, Begin {...}, Begin <space>, etc.
+    Does NOT match: BeginTrans, BeginScope, etc.
+
+    The metadata Begin must be followed by:
+    - whitespace
+    - opening brace {
+    - nothing (end of line)
+    """
+    stripped = line.strip()
+    # Match "Begin" only when followed by whitespace, {, or end of line
+    return re.match(r"^Begin(?:\s|{|\s*$)", stripped, re.IGNORECASE) is not None
+
+
+def _is_end_statement(line: str) -> bool:
+    """
+    Detect END statement (end of metadata block).
+    Matches: End, END, etc. (but not End Sub, End Function, etc.)
+    """
+    stripped = line.strip()
+    # Match standalone "End" but not "End Sub", "End Function", etc.
+    return re.match(r"^End\s*$", stripped, re.IGNORECASE) is not None
+
+
 def _is_metadata_line(line: str) -> bool:
     """
-    Detect VBA metadata lines.
+    Detect VBA metadata lines (non-metadata BEGIN/END blocks).
+    Note: Metadata BEGIN/END blocks are handled separately by _is_begin_statement/_is_end_statement.
     """
     stripped = line.strip()
 
     metadata_patterns = [
         r"^VERSION\s+",
-        r"^BEGIN\s*$",
-        r"^END\s*$",
         r"^Attribute\s+VB_",
         r"^Option\s+Explicit\s*$",
         r"^#If\s+",
@@ -328,6 +360,49 @@ def _add_procedure_spacing(lines: List[str]) -> List[str]:
 
                 if next_line.strip():
                     result.append("")
+
+    return result
+
+
+def _add_spacing_after_metadata_header(lines: List[str]) -> List[str]:
+    """
+    Add blank line after metadata header section (VERSION/BEGIN/END/Attributes).
+
+    For class files:
+    VERSION 1.0 CLASS
+    BEGIN
+      MultiUse = -1
+    END
+    Attribute VB_Name = "casAPI"
+
+    [blank line added here]
+
+    Public Function Test()
+    """
+    result = []
+    last_was_attribute = False
+    last_was_metadata_block = False
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        result.append(line)
+
+        # Track if this is an Attribute line
+        if re.match(r"^Attribute\s+VB_", stripped, re.IGNORECASE):
+            last_was_attribute = True
+            last_was_metadata_block = False
+        # Track if we just exited a metadata BEGIN/END block
+        elif re.match(r"^End\s*$", stripped, re.IGNORECASE):
+            last_was_metadata_block = True
+            last_was_attribute = False
+        # If we see a non-metadata, non-blank line after attributes/blocks
+        elif stripped and not re.match(r"^(?:VERSION|Attribute|Begin|End\s*$)", stripped, re.IGNORECASE):
+            if last_was_attribute or last_was_metadata_block:
+                # Add blank line if next line isn't already blank
+                if i + 1 < len(lines) and lines[i + 1].strip():
+                    result.append("")
+            last_was_attribute = False
+            last_was_metadata_block = False
 
     return result
 
