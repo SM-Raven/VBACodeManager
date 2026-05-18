@@ -32,7 +32,7 @@ def export_command(
     Supports:
         vcm export                          (skip existing, export new)
         vcm export --onefile cls/MyClass    (ask user if file exists)
-        vcm export --force                  (overwrite all)
+        vcm export --force                  (overwrite all - deletes src folder first)
         vcm export --onefile cls/MyClass --force (overwrite immediately)
     """
 
@@ -40,6 +40,13 @@ def export_command(
 
         fs = FileSystem()
         fs.ensure_structure()
+
+        # Delete src folder if force is True and onefile is not specified
+        if force and not onefile:
+            import shutil
+            if fs.src_dir.exists():
+                shutil.rmtree(fs.src_dir)
+            fs.ensure_structure()
 
         wb = get_active_workbook()
         vb_components = wb.VBProject.VBComponents

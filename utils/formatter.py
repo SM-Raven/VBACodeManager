@@ -12,7 +12,7 @@ def format_vba_code(code: str, indent: int = 4) -> str:
     - Proper indentation
     - Block spacing
     - Procedure spacing
-    - Metadata preservation
+    - Metadata preservation (including indentation within BEGIN/END blocks)
     """
     if not code:
         return code
@@ -32,9 +32,14 @@ def format_vba_code(code: str, indent: int = 4) -> str:
             processed_lines.append(stripped_line)
             continue
 
-        # Preserve metadata formatting
+        # Preserve metadata formatting (including indentation within BEGIN/END blocks)
         if _is_metadata_line(stripped_line):
-            processed_lines.append(original_line)
+            if in_metadata_block:
+                # Preserve original indentation inside BEGIN/END metadata blocks
+                processed_lines.append(original_line)
+            else:
+                # For standalone metadata lines, preserve original formatting
+                processed_lines.append(original_line)
 
             if stripped_line.upper().startswith("BEGIN"):
                 in_metadata_block = True

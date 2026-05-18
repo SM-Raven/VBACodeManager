@@ -75,6 +75,16 @@ def import_command(
                         vbproj.VBComponents.Remove(existing)
 
                     vbproj.VBComponents.Import(str(file_path))
+
+                    # Remove blank line at top if it exists
+                    vb_comp = _get_component(vbproj, component_name)
+                    if vb_comp:
+                        cm = vb_comp.CodeModule
+                        if cm.CountOfLines > 0:
+                            first_line = cm.Lines(1, 1).strip()
+                            if first_line == "":
+                                cm.DeleteLines(1, 1)
+
                     typer.echo(f"✅ Imported: {folder_name}/{component_name}")
 
                 elif component_type == ComponentType.DOCUMENT_MODULE:
