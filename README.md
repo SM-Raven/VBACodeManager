@@ -222,6 +222,9 @@ After installing dependencies, you can build a standalone executable.
 ### Build command:
 
 ```bash
+Remove-Item -Recurse -Force build
+Remove-Item -Recurse -Force dist
+Remove-Item -Force vcm.spec
 python -m PyInstaller --onefile --name vcm --icon=VCM.ico --paths=. main.py
 ```
 
