@@ -22,6 +22,7 @@ def format_vba_code(code: str, indent: int = 2) -> str:
     processed_lines = []
     current_indent_level = 0
     in_metadata_block = False
+    last_was_select_case = False
 
     for line in lines:
         original_line = line.rstrip()
@@ -57,9 +58,20 @@ def format_vba_code(code: str, indent: int = 2) -> str:
         # Preserve blank lines for cleanup later
         if not stripped_line:
             processed_lines.append("")
+            last_was_select_case = False
             continue
 
-        # Else/Case handling
+        # Special handling for first Case after Select Case
+        # The first Case should be indented normally (not dedented)
+        if last_was_select_case and re.match(r"^Case\s+", stripped_line, re.IGNORECASE):
+            processed_lines.append(
+                (" " * (current_indent_level * indent)) + stripped_line
+            )
+            current_indent_level += 1
+            last_was_select_case = False
+            continue
+
+        # Else/Case handling (for subsequent Cases and Else/ElseIf)
         if _is_else_like_statement(stripped_line):
             current_indent_level = max(0, current_indent_level - 1)
 
@@ -68,6 +80,7 @@ def format_vba_code(code: str, indent: int = 2) -> str:
             )
 
             current_indent_level += 1
+            last_was_select_case = False
             continue
 
         # Closing blocks
@@ -78,6 +91,7 @@ def format_vba_code(code: str, indent: int = 2) -> str:
                 (" " * (current_indent_level * indent)) + stripped_line
             )
 
+            last_was_select_case = False
             continue
 
         # Regular/opening statements
@@ -87,6 +101,11 @@ def format_vba_code(code: str, indent: int = 2) -> str:
 
         if _is_opening_statement(stripped_line):
             current_indent_level += 1
+            # Track if this is a Select Case so we handle the first Case specially
+            if re.match(r"^Select\s+Case\s+", stripped_line, re.IGNORECASE):
+                last_was_select_case = True
+        else:
+            last_was_select_case = False
 
     # Cleanup + spacing passes
     cleaned_lines = _cleanup_blank_lines(processed_lines)
@@ -307,13 +326,19 @@ def _handle_option_explicit(lines: List[str]) -> List[str]:
 
 def _add_procedure_spacing(lines: List[str]) -> List[str]:
     """
-    Add spacing inside procedures/functions/properties.
+    Add spacing inside procedures/functions/properties and between them.
 
     Result:
 
     Private Sub Test()
 
         Debug.Print "Hello"
+
+    End Sub
+
+    Private Sub Test2()
+
+        Debug.Print "World"
 
     End Sub
     """
@@ -359,6 +384,13 @@ def _add_procedure_spacing(lines: List[str]) -> List[str]:
                 next_line = lines[i + 1]
 
                 if next_line.strip():
+                    result.append("")
+
+        # Blank line AFTER End Sub/Function/Property (before next procedure)
+        if matches_any(stripped, procedure_end_patterns):
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                if next_line and matches_any(next_line, procedure_start_patterns):
                     result.append("")
 
     return result
