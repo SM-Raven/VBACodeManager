@@ -38,7 +38,7 @@ def format_command(
 
     typer.echo("")
     typer.echo("=" * 50)
-    typer.echo("✅ Formatting complete")
+    typer.echo("Formatting complete")
     typer.echo(f"   Files processed: {count}")
     typer.echo("=" * 50)
 
@@ -75,14 +75,14 @@ def _format_one(src_path: Path, onefile: str, indent: int) -> int:
     try:
         component_type, name = onefile.split("/", 1)
     except ValueError:
-        raise typer.Exit("❌ Format must be: cls/MyClass")
+        raise typer.Exit("Format must be: cls/MyClass")
 
     folder = src_path / component_type
 
     matches = list(folder.glob(f"{name}.*"))
 
     if not matches:
-        raise typer.Exit(f"❌ File not found: {onefile}")
+        raise typer.Exit(f"File not found: {onefile}")
 
     file_path = matches[0]
 
@@ -91,9 +91,9 @@ def _format_one(src_path: Path, onefile: str, indent: int) -> int:
 
     if formatted != code:
         file_path.write_text(formatted, encoding="utf-8")
-        typer.echo(f"✓ Formatted: {file_path.name}")
+        typer.echo(f"Formatted: {file_path.name}")
     else:
-        typer.echo(f"⊘ Already formatted: {file_path.name}")
+        typer.echo(f"Already formatted: {file_path.name}")
 
     return 1
 

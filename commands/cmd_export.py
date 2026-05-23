@@ -39,20 +39,19 @@ def export_command(
     try:
 
         fs = FileSystem()
-        fs.ensure_structure()
 
         # Delete src folder if force is True and onefile is not specified
         if force and not onefile:
-            import shutil
-            if fs.src_dir.exists():
-                shutil.rmtree(fs.src_dir)
+            fs.reset_src()
+        else:
             fs.ensure_structure()
 
-        wb = get_active_workbook()
-        vb_components = wb.VBProject.VBComponents
+        workbook_project = get_active_workbook()
+        vb_components = workbook_project.VBProject.VBComponents
 
         exported_count = 0
         skipped_count = 0
+        failed_count = 0
         target_component = None
 
         if onefile:
@@ -70,71 +69,56 @@ def export_command(
             extension = EXPORT_EXTENSIONS[component_type]
             component_identifier = f"{folder_name}/{component_name}"
 
-            # Skip if not matching --onefile target
             if target_component and component_identifier != target_component:
                 continue
 
-            # Build export path
             export_path = fs.src_dir / folder_name / f"{component_name}{extension}"
 
-            # Handle existing files
             if export_path.exists():
                 if onefile and not force:
-                    # Scenario: export -o name (ask user)
                     if not typer.confirm(
-                        f"⚠️ {component_identifier} already exists. Overwrite and potentially lose progress?"
-                    ):
-                        typer.echo(f"⏭️ Skipped existing: {component_identifier}")
+                        f"{component_identifier} already exists. Overwrite and potentially lose progress?"):
+                        typer.echo(f"Skipped: {component_identifier}")
                         skipped_count += 1
                         continue
                 elif not onefile and not force:
-                    # Scenario: export (skip existing)
-                    typer.echo(f"⏭️ Skipped existing: {component_identifier}")
+                    typer.echo(f"Skipped existing: {component_identifier}")
                     skipped_count += 1
                     continue
-                # Scenarios: export -f OR export -o name -f (proceed to export)
 
-            # Export the component
             try:
-                if component_type in {
-                    ComponentType.STANDARD_MODULE,
-                    ComponentType.CLASS_MODULE,
-                    ComponentType.USER_FORM,
-                }:
-                    # Use VBA's built-in Export method
-                    component.Export(str(export_path))
-                elif component_type == ComponentType.DOCUMENT_MODULE:
-                    # Document modules need manual code extraction
-                    code_module = component.CodeModule
-                    total_lines = code_module.CountOfLines
-                    code = clean_vba_code(code_module.Lines(1, total_lines))
+                code_module = component.CodeModule
+                total_lines = code_module.CountOfLines
+                code = clean_vba_code(code_module.Lines(1, total_lines))
 
-                    with open(export_path, "w", encoding="utf-8") as file:
-                        file.write(code)
+                with open(export_path, "w", encoding="utf-8") as file:
+                    file.write(code)
 
-                typer.echo(f"✅ Exported: {component_identifier}")
+                typer.echo(f"Exported: {component_identifier}")
                 exported_count += 1
 
             except Exception as e:
                 typer.echo(
-                    f"❌ Failed to export {component_name}: {e}",
+                    f"Failed to export {component_name}: {e}",
                     err=True,
                 )
+                failed_count += 1
 
-        # Handle component not found
         if target_component and exported_count == 0 and skipped_count == 0:
             typer.echo(
-                f"❌ Component not found: {target_component}",
+                f"Component not found: {target_component}",
                 err=True,
             )
             raise typer.Exit(code=1)
 
         typer.echo(
-            f"\n📦 Export complete | Exported: {exported_count} | Skipped: {skipped_count}\n"
-        )
+            f"\nExport complete | Exported: {exported_count} | Skipped: {skipped_count} | Failed: {failed_count}\n")
+
+        if failed_count > 0:
+            raise typer.Exit(code=1)
 
     except Exception as e:
-        typer.echo(f"❌ Export failed: {e}", err=True)
+        typer.echo(f"Export failed: {e}", err=True)
         raise typer.Exit(code=1)
 
 def clean_vba_code(code: str) -> str:

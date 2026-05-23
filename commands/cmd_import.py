@@ -1,8 +1,9 @@
+from click import Path
 import typer
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 from utils.workbook import get_active_workbook
 from utils.file_system import FileSystem
-from constants import ComponentType, EXPORT_EXTENSIONS, EXPORT_FOLDERS
+from constants import ComponentType, EXPORT_EXTENSIONS, EXPORT_FOLDERS, SUPPORTED_COMPONENT_TYPES
 
 app = typer.Typer(help="Import VBA components to Excel workbook")
 
@@ -22,7 +23,7 @@ def import_command(
     ),
 ):
     """
-    Import VBA components from src folder to Excel workbook
+    Import VBA Code from src folder to Excel workbook.
 
     Supports:
         vcm import                          (import all components)
@@ -30,14 +31,14 @@ def import_command(
         vcm import --force                  (import all, delete missing)
     """
     try:
-        fs = FileSystem()
+        project_file_system: FileSystem = FileSystem()
 
-        if not fs.is_structure_valid():
-            typer.echo("❌ No src folder structure found. Run 'vcm export' first.", err=True)
+        if not project_file_system.is_structure_valid():
+            typer.echo("No src folder structure found. Run 'vcm export' first.", err=True)
             raise typer.Exit(code=1)
 
-        wb = get_active_workbook()
-        vbproj = wb.VBProject
+        project_workbook: Any = get_active_workbook()
+        vba_project = project_workbook.VBProject
 
         imported_count = 0
         failed_count = 0
@@ -50,48 +51,27 @@ def import_command(
         )
 
         components = (
-            _get_single_component(fs, target_component)
+            _get_single_component(project_file_system, target_component)
             if target_component
-            else _get_all_components(fs)
+            else _get_all_components(project_file_system)
         )
 
         if not components:
-            typer.echo("⚠️ No components found to import")
+            typer.echo("No components found to import")
             return
 
-        typer.echo(f"[vcm] Importing into: {wb.Name}")
+        typer.echo(f"[vcm] Importing into: {project_workbook.Name}")
 
         for folder_name, component_name, file_path in components:
             try:
                 component_type = _get_component_type_from_folder(folder_name)
 
-                if component_type in {
-                    ComponentType.STANDARD_MODULE,
-                    ComponentType.CLASS_MODULE,
-                    ComponentType.USER_FORM,
-                }:
-                    existing = _get_component(vbproj, component_name)
-                    if existing:
-                        vbproj.VBComponents.Remove(existing)
+                if component_type in SUPPORTED_COMPONENT_TYPES:
 
-                    vbproj.VBComponents.Import(str(file_path))
-
-                    # Remove blank line at top if it exists
-                    vb_comp = _get_component(vbproj, component_name)
-                    if vb_comp:
-                        cm = vb_comp.CodeModule
-                        if cm.CountOfLines > 0:
-                            first_line = cm.Lines(1, 1).strip()
-                            if first_line == "":
-                                cm.DeleteLines(1, 1)
-
-                    typer.echo(f"✅ Imported: {folder_name}/{component_name}")
-
-                elif component_type == ComponentType.DOCUMENT_MODULE:
-                    vb_comp = _get_component(vbproj, component_name)
+                    vb_comp = _get_component(vba_project, component_name)
 
                     if not vb_comp:
-                        typer.echo(f"⚠️ Excel object not found: {component_name}", err=True)
+                        typer.echo(f"Excel object not found: {component_name}", err=True)
                         failed_count += 1
                         continue
 
@@ -101,39 +81,39 @@ def import_command(
                     cm.DeleteLines(1, cm.CountOfLines)
                     cm.AddFromString(code)
 
-                    typer.echo(f"✅ Updated: {folder_name}/{component_name}")
+                    typer.echo(f"Imported: {folder_name}/{component_name}")
 
                 imported_count += 1
 
             except Exception as e:
                 failed_count += 1
-                typer.echo(f"❌ Failed {component_name}: {e}", err=True)
+                typer.echo(f"Failed {component_name}: {e}", err=True)
 
         if force:
             typer.echo("[vcm] Force mode: cleaning orphan components...")
 
-            src_names = _collect_src_component_names(fs)
-            snapshot = list(vbproj.VBComponents)
+            src_names = _collect_src_component_names(project_file_system)
+            snapshot = list(vba_project.VBComponents)
 
             for comp in snapshot:
                 try:
                     if comp.Type != ComponentType.DOCUMENT_MODULE:
                         if comp.Name not in src_names:
                             name = comp.Name
-                            vbproj.VBComponents.Remove(comp)
-                            typer.echo(f"🗑️ Removed: {name}")
+                            vba_project.VBComponents.Remove(comp)
+                            typer.echo(f"Removed: {name}")
                             deleted_count += 1
                 except Exception:
                     continue
 
         try:
-            wb.Save()
+            project_workbook.Save()
             typer.echo("[vcm] Workbook saved.")
         except Exception as e:
-            typer.echo(f"❌ Save failed: {e}", err=True)
+            typer.echo(f"Save failed: {e}", err=True)
 
         typer.echo(
-            f"\n📦 Import complete | Imported: {imported_count} | Deleted: {deleted_count} | Failed: {failed_count}\n"
+            f"\nImport complete | Imported: {imported_count} | Deleted: {deleted_count} | Failed: {failed_count}\n"
         )
 
         if failed_count > 0:
@@ -143,38 +123,42 @@ def import_command(
         typer.echo(f"❌ Import failed: {e}", err=True)
         raise typer.Exit(code=1)
 
-def _get_single_component(fs: FileSystem, target: str) -> List[Tuple[str, str, object]]:
+def _get_single_component(fs: FileSystem, target: str) -> list[tuple[str, str, Path]]:
     parts = target.split("/")
     if len(parts) != 2:
-        typer.echo("❌ Invalid format. Use 'cls/MyClass'", err=True)
+        typer.echo("Invalid format. Use 'cls/MyClass'", err=True)
         raise typer.Exit(code=1)
 
-    folder_name, component_name = parts
+    target_folder: str = parts[0].lower()
+    component_name: str = parts[1].lower()
 
-    if folder_name not in EXPORT_FOLDERS.values():
-        typer.echo(f"❌ Invalid folder: {folder_name}", err=True)
+    if target_folder not in EXPORT_FOLDERS.values():
+        typer.echo(f"Invalid folder: {target_folder}", err=True)
         raise typer.Exit(code=1)
 
-    extension = None
-    for ctype, fname in EXPORT_FOLDERS.items():
-        if fname == folder_name:
-            extension = EXPORT_EXTENSIONS[ctype]
+    extension: str | None = None
+    for comp_type, folder_name in EXPORT_FOLDERS.items():
+        if folder_name == target_folder:
+            extension = EXPORT_EXTENSIONS[comp_type]
             break
 
-    file_path = fs.src_dir / folder_name / f"{component_name}{extension}"
+    if extension is None:
+        typer.echo("Invalid extension mapping", err=True)
+        raise typer.Exit(code=1)
+    file_path: Path = fs.src_dir / target_folder / f"{component_name}{extension}"
 
     if not file_path.exists():
-        typer.echo(f"❌ File not found: {file_path}", err=True)
+        typer.echo(f"File not found: {file_path}", err=True)
         raise typer.Exit(code=1)
 
-    return [(folder_name, component_name, file_path)]
+    return [(target_folder, component_name, file_path)]
 
 
-def _get_all_components(fs: FileSystem) -> List[Tuple[str, str, object]]:
-    components = []
+def _get_all_components(fs: FileSystem) -> list[tuple[str, str, Path]]:
+    components: list[tuple[str, str, Path]] = []
 
     for folder_name in EXPORT_FOLDERS.values():
-        folder_path = fs.src_dir / folder_name
+        folder_path: Path = fs.src_dir / folder_name
 
         if not folder_path.exists():
             continue
@@ -183,10 +167,12 @@ def _get_all_components(fs: FileSystem) -> List[Tuple[str, str, object]]:
             if not file_path.is_file():
                 continue
 
-            if file_path.suffix == ".frx":
+            if file_path.suffix.lower() == ".frx":
                 continue
 
-            components.append((folder_name, file_path.stem, file_path))
+            components.append(
+                (folder_name, file_path.stem, file_path)
+            )
 
     return components
 

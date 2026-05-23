@@ -1,37 +1,44 @@
-from pathlib import Path
-from constants import SUPPORTED_VBA_PROJECTS
 import win32com.client
 import typer
+from pathlib import Path
+from typing import Any
+from constants import SUPPORTED_VBA_PROJECTS
 
-def get_active_workbook():
+
+def get_active_workbook() -> Any:
+    """
+        Returns instance of valid VBA Project Workbook.
+        Error when multiple workbook is open in current directory.
+        Error when no open workbook.
+        This ensure to return one valid Worbook Open in current directory.
+    """
+
     try:
-        excel = win32com.client.GetObject(Class="Excel.Application")
+        excel: Any = win32com.client.GetObject(Class="Excel.Application")
     except Exception:
-        typer.echo("❌ Excel is not running")
+        typer.echo("Excel is not running")
         raise typer.Exit(code=1)
 
-    cwd = Path.cwd().resolve()
-    match = None
+    root_directory: Path = Path.cwd().resolve()
+    match: Any | None = None
 
-    for wb in excel.Workbooks:
+    for workbook in excel.Workbooks:
         try:
-            wb_path = Path(wb.FullName).resolve()
+            wb_path: Path = Path(workbook.FullName).resolve()
         except Exception:
-            continue  # skip unsaved or invalid workbooks
+            continue
 
-        # 🔹 Validate file type
         if wb_path.suffix.lower() not in SUPPORTED_VBA_PROJECTS:
             continue
 
-        # 🔹 Match current working directory
-        if wb_path.parent == cwd:
+        if wb_path.parent == root_directory:
             if match is not None:
-                typer.echo("❌ Multiple workbooks open in this directory")
+                typer.echo("Multiple workbooks open in this directory.")
                 raise typer.Exit(code=1)
-            match = wb
+            match = workbook
 
     if match is None:
-        typer.echo("❌ No supported workbook open in current directory")
+        typer.echo("No supported workbook open in current directory")
         raise typer.Exit(code=1)
 
     return match
