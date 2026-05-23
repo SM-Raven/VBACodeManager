@@ -85,7 +85,13 @@ def format_vba_code(code: str, indent: int = 2) -> str:
 
         # Closing blocks
         if _is_closing_statement(stripped_line):
-            current_indent_level = max(0, current_indent_level - 1)
+
+            # End Select needs one extra dedent because
+            # Case blocks temporarily re-increase indentation
+            if re.match(r"^End\s+Select\s*$", stripped_line, re.IGNORECASE):
+                current_indent_level = max(0, current_indent_level - 2)
+            else:
+                current_indent_level = max(0, current_indent_level - 1)
 
             processed_lines.append(
                 (" " * (current_indent_level * indent)) + stripped_line
@@ -114,6 +120,7 @@ def format_vba_code(code: str, indent: int = 2) -> str:
     cleaned_lines = _add_procedure_spacing(cleaned_lines)
     cleaned_lines = _remove_blank_lines_in_type_enum(cleaned_lines)
     cleaned_lines = _add_blank_lines_around_blocks(cleaned_lines)
+    cleaned_lines = _remove_blank_lines_in_properties(cleaned_lines)
     cleaned_lines = _cleanup_blank_lines(cleaned_lines)
 
     return "\n".join(cleaned_lines)
@@ -194,8 +201,8 @@ def _is_opening_statement(line: str) -> bool:
         r"^Do\b",
         r"^While\s+",
         r"^With\s+",
-        r"^Type\s+",
-        r"^Enum\s+",
+        r"^(?:Public\s+|Private\s+)?Type\s+",
+        r"^(?:Public\s+|Private\s+)?Enum\s+",
     ]
 
     for pattern in opening_patterns:
@@ -378,8 +385,9 @@ def _add_procedure_spacing(lines: List[str]) -> List[str]:
 
         result.append(line)
 
-        # Blank line AFTER Sub/Function/Property declaration
+        # Blank line AFTER Sub/Function declaration
         if matches_any(stripped, procedure_start_patterns):
+
             if i + 1 < len(lines):
                 next_line = lines[i + 1]
 
@@ -523,6 +531,42 @@ def _remove_blank_lines_in_type_enum(lines: List[str]) -> List[str]:
 
         # Skip blank lines inside Type/Enum
         if inside_block and not stripped:
+            continue
+
+        result.append(line)
+
+    return result
+
+
+def _remove_blank_lines_in_properties(lines: List[str]) -> List[str]:
+    """
+    Remove blank lines inside Property Get/Let/Set blocks.
+    """
+
+    result = []
+    inside_property = False
+
+    property_start = re.compile(
+        r"^(?:Public\s+|Private\s+|Friend\s+|Protected\s+)?Property\s+(Get|Let|Set)\b",
+        re.I,
+    )
+
+    property_end = re.compile(r"^End\s+Property\s*$", re.I)
+
+    for line in lines:
+        stripped = line.strip()
+
+        if property_start.match(line):
+            inside_property = True
+            result.append(line)
+            continue
+
+        if property_end.match(line):
+            inside_property = False
+            result.append(line)
+            continue
+
+        if inside_property and not stripped:
             continue
 
         result.append(line)
