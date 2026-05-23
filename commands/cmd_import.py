@@ -77,6 +77,11 @@ def import_command(
 
                     code = file_path.read_text(encoding="utf-8")
 
+                    # Skip empty files
+                    if not code or not code.strip():
+                        typer.echo(f"Skipped (empty): {folder_name}/{component_name}")
+                        continue
+
                     cm = vb_comp.CodeModule
                     cm.DeleteLines(1, cm.CountOfLines)
                     cm.AddFromString(code)

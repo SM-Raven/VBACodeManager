@@ -89,8 +89,15 @@ def export_command(
             try:
                 code_module = component.CodeModule
                 total_lines = code_module.CountOfLines
-                code = clean_vba_code(code_module.Lines(1, total_lines))
 
+                try:
+                    code = clean_vba_code(code_module.Lines(1, total_lines))
+                except Exception as e:
+                    # Component is corrupted, but create empty file anyway
+                    typer.echo(f"Exported (corrupted/empty): {component_identifier}")
+                    code = ""
+
+                # Write file even if empty - this preserves the component reference
                 with open(export_path, "w", encoding="utf-8") as file:
                     file.write(code)
 
@@ -121,28 +128,40 @@ def export_command(
         typer.echo(f"Export failed: {e}", err=True)
         raise typer.Exit(code=1)
 
+
 def clean_vba_code(code: str) -> str:
-    lines = code.splitlines()
+    """Clean VBA code by removing extra blank lines and artifacts"""
+    try:
+        lines = code.splitlines()
 
-    cleaned = []
-    prev_blank = True  # important: prevents leading blank lines
+        cleaned = []
+        prev_blank = True  # important: prevents leading blank lines
 
-    for line in lines:
-        is_blank = line == ""
+        for line in lines:
+            is_blank = line == ""
 
-        if is_blank:
-            if not prev_blank:
-                cleaned.append("")
-            prev_blank = True
-        else:
-            cleaned.append(line)
-            prev_blank = False
+            if is_blank:
+                if not prev_blank:
+                    cleaned.append("")
+                prev_blank = True
+            else:
+                cleaned.append(line)
+                prev_blank = False
 
-    # remove trailing blank lines
-    while cleaned and cleaned[-1] == "":
-        cleaned.pop()
+        # remove trailing blank lines
+        while cleaned and cleaned[-1] == "":
+            cleaned.pop()
 
-    return "\n".join(cleaned)
+        # Remove trailing () artifacts from Excel COM API
+        if cleaned and cleaned[-1].strip() == "()":
+            cleaned.pop()
+
+        return "\n".join(cleaned)
+
+    except Exception:
+        # If cleaning fails, return empty string
+        return ""
+
 
 if __name__ == "__main__":
     app()
