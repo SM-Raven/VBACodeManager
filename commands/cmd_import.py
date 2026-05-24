@@ -1,4 +1,4 @@
-from click import Path
+from pathlib import Path
 import typer
 from typing import Optional, List, Tuple, Any
 from utils.workbook import get_active_workbook
