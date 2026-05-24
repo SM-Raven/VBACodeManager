@@ -82,6 +82,10 @@ def import_command(
                         typer.echo(f"Skipped (empty): {folder_name}/{component_name}")
                         continue
 
+                     # Ensure code ends with newline (prevents () artifact)
+                    if not code.endswith('\n'):
+                        code += '\n'
+
                     cm = vb_comp.CodeModule
                     cm.DeleteLines(1, cm.CountOfLines)
                     cm.AddFromString(code)
