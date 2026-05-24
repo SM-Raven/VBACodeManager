@@ -9,7 +9,7 @@ from commands.cmd_export import export_command
 from commands.cmd_import import import_command
 from commands.cmd_format import format_command
 
-VCM_VERSION: str = "0.2.1"
+VCM_VERSION: str = "0.2.2"
 
 app = typer.Typer(
     name="vcm",

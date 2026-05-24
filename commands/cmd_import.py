@@ -82,13 +82,20 @@ def import_command(
                         typer.echo(f"Skipped (empty): {folder_name}/{component_name}")
                         continue
 
-                     # Ensure code ends with newline (prevents () artifact)
+                    # Ensure code ends with newline (prevents () artifact)
                     if not code.endswith('\n'):
                         code += '\n'
 
                     cm = vb_comp.CodeModule
                     cm.DeleteLines(1, cm.CountOfLines)
                     cm.AddFromString(code)
+
+                    # Remove () artifact that Excel COM API adds
+                    total_lines = cm.CountOfLines
+                    if total_lines > 0:
+                        last_line = cm.Lines(total_lines, 1).strip()
+                        if last_line == "()":
+                            cm.DeleteLines(total_lines, 1)
 
                     typer.echo(f"Imported: {folder_name}/{component_name}")
 
