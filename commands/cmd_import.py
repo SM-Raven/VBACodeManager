@@ -65,39 +65,44 @@ def import_command(
         for folder_name, component_name, file_path in components:
             try:
                 component_type = _get_component_type_from_folder(folder_name)
-
-                if component_type in SUPPORTED_COMPONENT_TYPES:
-
+                if component_type in {ComponentType.STANDARD_MODULE, ComponentType.DOCUMENT_MODULE, ComponentType.USER_FORM}:
                     vb_comp = _get_component(vba_project, component_name)
-
                     if not vb_comp:
                         typer.echo(f"Excel object not found: {component_name}", err=True)
                         failed_count += 1
                         continue
-
                     code = file_path.read_text(encoding="utf-8")
 
-                    # Skip empty files
                     if not code or not code.strip():
                         typer.echo(f"Skipped (empty): {folder_name}/{component_name}")
                         continue
 
-                    # Ensure code ends with newline (prevents () artifact)
                     if not code.endswith('\n'):
                         code += '\n'
-
                     cm = vb_comp.CodeModule
                     cm.DeleteLines(1, cm.CountOfLines)
                     cm.AddFromString(code)
+                    typer.echo(f"Imported: {folder_name}/{component_name}")
+                elif component_type == ComponentType.CLASS_MODULE:
+                    existing = _get_component(vba_project, component_name)
+                    if existing:
+                        vba_project.VBComponents.Remove(existing)
+                    vba_project.VBComponents.Import(str(file_path))
+                    typer.echo(f"Imported: {folder_name}/{component_name}")
 
-                    # Remove () artifact that Excel COM API adds
+                vb_comp = _get_component(vba_project, component_name)
+                if vb_comp:
+                    cm = vb_comp.CodeModule
+
+                    while cm.CountOfLines > 0 and cm.Lines(1, 1).strip() == "":
+                        cm.DeleteLines(1, 1)
+
                     total_lines = cm.CountOfLines
                     if total_lines > 0:
-                        last_line = cm.Lines(total_lines, 1).strip()
-                        if last_line == "()":
-                            cm.DeleteLines(total_lines, 1)
-
-                    typer.echo(f"Imported: {folder_name}/{component_name}")
+                        while cm.CountOfLines > 0 and cm.Lines(cm.CountOfLines, 1).strip() == "":
+                            cm.DeleteLines(cm.CountOfLines, 1)
+                        if cm.CountOfLines > 0:
+                            cm.InsertLines(cm.CountOfLines + 1, "")
 
                 imported_count += 1
 

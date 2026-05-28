@@ -87,19 +87,23 @@ def export_command(
                     continue
 
             try:
-                code_module = component.CodeModule
-                total_lines = code_module.CountOfLines
+                if component_type in {ComponentType.STANDARD_MODULE, ComponentType.DOCUMENT_MODULE, ComponentType.USER_FORM,}:
+                    code_module = component.CodeModule
+                    total_lines = code_module.CountOfLines
 
-                try:
-                    code = clean_vba_code(code_module.Lines(1, total_lines))
-                except Exception as e:
-                    # Component is corrupted, but create empty file anyway
-                    typer.echo(f"Exported (corrupted/empty): {component_identifier}")
-                    code = ""
+                    try:
+                        code = clean_vba_code(code_module.Lines(1, total_lines))
+                    except Exception as e:
+                        # Component is corrupted, but create empty file anyway
+                        typer.echo(f"Exported (corrupted/empty): {component_identifier}")
+                        code = ""
 
-                # Write file even if empty - this preserves the component reference
-                with open(export_path, "w", encoding="utf-8") as file:
-                    file.write(code)
+                    # Write file even if empty - this preserves the component reference
+                    with open(export_path, "w", encoding="utf-8") as file:
+                        file.write(code)
+
+                elif component_type == ComponentType.CLASS_MODULE:
+                    component.Export(str(export_path))
 
                 typer.echo(f"Exported: {component_identifier}")
                 exported_count += 1
